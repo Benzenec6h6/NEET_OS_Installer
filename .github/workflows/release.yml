@@ -1,22 +1,68 @@
-# 1. ビルドする
+name: Build and Release Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  schedule:
+    # 毎週水曜日 UTC 00:00 (日本時間 09:00) に自動実行
+    - cron: '0 0 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: write # リポジトリへのプッシュおよび Releases 作成に必要
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - name: Setup Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v9
+
+      # 毎週水曜日（または手動実行）の場合に flake.lock を更新してコミット＆プッシュ
+      - name: Update flake.lock (Scheduled)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          nix flake update
+
+          # flake.lock に差分があればリポジトリにプッシュ
+          if ! git diff --quiet flake.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: update flake.lock"
+            git push origin ${{ github.ref_name }}
+          fi
+
+      # インストーライメージのビルド（sha256sum.txt も一緒に生成される）
       - name: Build disk image
         run: |
           nix build .#installer
 
-      # 2. そのまま Releases に渡して公開（再計算ステップは全削除）
+      # GitHub Releases を作成してアセットをアップロード
       - name: Create Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="${GITHUB_REF_NAME}"
-          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
-            TAG_NAME="dev-$(date +'%Y%m%d%H%M%S')"
+          # タグの命名規則:
+          # - git tag push の場合: そのタグ名 (例: v1.0.0)
+          # - 水曜日の定期実行の場合: weekly-YYYYMMDD (例: weekly-20261021)
+          # - 手動実行の場合: manual-YYYYMMDD
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
+            TAG_NAME="weekly-$(date +'%Y%m%d')"
+          else
+            TAG_NAME="manual-$(date +'%Y%m%d%H%M%S')"
           fi
 
-          # result/ 配下の成果物をそのまま指定
           gh release create "$TAG_NAME" \
             result/neet-live-image.img.zst \
             result/sha256sum.txt \
             --title "NEET OS Installer $TAG_NAME" \
-            --notes "Automated build of NEET OS Live Installer." \
-            --generate-notes
+            --notes "Automated release built on $(date +'%Y-%m-%d')."
