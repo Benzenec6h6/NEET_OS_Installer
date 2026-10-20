@@ -1,0 +1,22 @@
+# 1. ビルドする
+      - name: Build disk image
+        run: |
+          nix build .#installer
+
+      # 2. そのまま Releases に渡して公開（再計算ステップは全削除）
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            TAG_NAME="dev-$(date +'%Y%m%d%H%M%S')"
+          fi
+
+          # result/ 配下の成果物をそのまま指定
+          gh release create "$TAG_NAME" \
+            result/neet-live-image.img.zst \
+            result/sha256sum.txt \
+            --title "NEET OS Installer $TAG_NAME" \
+            --notes "Automated build of NEET OS Live Installer." \
+            --generate-notes
