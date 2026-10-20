@@ -1,23 +1,23 @@
-name: Build and Release Installer
+name: Weekly Update and Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   schedule:
-    # 毎週水曜日 UTC 00:00 (日本時間 09:00) に自動実行
+    # 毎週水曜日 UTC 00:00 (日本時間 09:00)
     - cron: '0 0 * * 3'
   workflow_dispatch:
 
-permissions:
-  contents: write # リポジトリへのプッシュおよび Releases 作成に必要
-
 jobs:
-  build:
+  update-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # タグの強制プッシュを行うため履歴を取得
+          fetch-depth: 0
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v16
@@ -25,44 +25,40 @@ jobs:
       - name: Setup Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@v9
 
-      # 毎週水曜日（または手動実行）の場合に flake.lock を更新してコミット＆プッシュ
-      - name: Update flake.lock (Scheduled)
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      # 1. flake.lock を更新
+      - name: Update flake.lock
+        run: nix flake update
+
+      # 2. 差分があれば自動コミット＆プッシュ
+      - name: Commit and push flake.lock
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: weekly flake.lock update"
+          file_pattern: flake.lock
+
+      # 3. インストーラ（img.zst と sha256sum.txt）をビルド
+      - name: Build Installer
+        run: nix build .#installer
+
+      # 4. 今日の日付を取得
+      - name: Set release date
+        run: echo "RELEASE_DATE=$(date +'%Y-%m-%d')" >> "$GITHUB_ENV"
+
+      # 5. "latest" タグを現在のコミットに強制付け替え
+      - name: Force-update latest tag
         run: |
-          nix flake update
+          git tag -f latest
+          git push origin latest --force
 
-          # flake.lock に差分があればリポジトリにプッシュ
-          if ! git diff --quiet flake.lock; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git commit -am "chore: update flake.lock"
-            git push origin ${{ github.ref_name }}
-          fi
-
-      # インストーライメージのビルド（sha256sum.txt も一緒に生成される）
-      - name: Build disk image
-        run: |
-          nix build .#installer
-
-      # GitHub Releases を作成してアセットをアップロード
-      - name: Create Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # タグの命名規則:
-          # - git tag push の場合: そのタグ名 (例: v1.0.0)
-          # - 水曜日の定期実行の場合: weekly-YYYYMMDD (例: weekly-20261021)
-          # - 手動実行の場合: manual-YYYYMMDD
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            TAG_NAME="${GITHUB_REF_NAME}"
-          elif [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
-            TAG_NAME="weekly-$(date +'%Y%m%d')"
-          else
-            TAG_NAME="manual-$(date +'%Y%m%d%H%M%S')"
-          fi
-
-          gh release create "$TAG_NAME" \
-            result/neet-live-image.img.zst \
-            result/sha256sum.txt \
-            --title "NEET OS Installer $TAG_NAME" \
-            --notes "Automated release built on $(date +'%Y-%m-%d')."
+      # 6. Releases の "latest" を上書き（古いファイルは削除）
+      - name: Update Latest Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: "latest"
+          name: "NEET OS Live Installer (Latest)"
+          body: "Automatically built on ${{ env.RELEASE_DATE }}"
+          artifacts: "result/neet-live-image.img.zst,result/sha256sum.txt"
+          allowUpdates: true
+          removeArtifacts: true    # ★ 前回の古い img.zst を消去して容量を節約
+          makeLatest: true
+          tag_exists_error: false
