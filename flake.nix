@@ -21,31 +21,15 @@
         # インストーラ機能を有効化
         {
           installer.enable = true;
-          services.nix-daemon.enable = true;
-          programs.resolvconf.enable = true;
-          services.dhcpcd.enable = true;
           services.iwd.enable = true;
           services.openssh = {
             enable = true;
             startOnBoot = false;
           };
-          services.deviceManager = "mdevd";
-          services.dbus.enable = true;
-          services.syslog.enable = true;
-          neet.security.enable = true;
           boot.console.keyMap = "jp106";
           programs.coreutils.package = pkgs.uutils-coreutils-noprefix;
-          programs.bash.enable = true;
           services.getty.autologinUser = "root";
-          hardware.firmware = [
-            pkgs.linux-firmware
-            pkgs.wireless-regdb
 
-            pkgs.sof-firmware
-            pkgs.alsa-firmware
-          ];
-
-          neet.security.privileges.backend = "sudo-rs";
           neet.users = {
             root = {
               uid = 0;
