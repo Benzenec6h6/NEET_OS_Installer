@@ -25,6 +25,9 @@
           services.openssh = {
             enable = true;
             startOnBoot = false;
+            settings = {
+              PermitRootLogin = "yes"; # パスワードログインを許可
+            };
           };
           boot.console.keyMap = "jp106";
           programs.coreutils.package = pkgs.uutils-coreutils-noprefix;
