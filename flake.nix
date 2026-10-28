@@ -26,34 +26,12 @@
             enable = true;
             startOnBoot = false;
             settings = {
-              PermitRootLogin = "yes"; # パスワードログインを許可
+              PermitRootLogin = "yes";
             };
           };
           boot.console.keyMap = "jp106";
           programs.coreutils.package = pkgs.uutils-coreutils-noprefix;
           services.getty.autologinUser = "neet";
-
-          neet.users = {
-            root = {
-              uid = 0;
-              gid = 0;
-              shell = "/bin/bash";
-              home = "/root";
-              description = "System Administrator";
-              initialHashedPassword = "";
-            };
-            neet = {
-              uid = 1000;
-              gid = 1000;
-              shell = "/bin/bash";
-              home = "/home/neet";
-              description = "Primary User";
-              extraGroups = ["audio" "video" "input" "seat" "wheel"];
-              initialHashedPassword = "";
-            };
-          };
-          # 必要に応じてホスト名やキーマップなどを追加
-          networking.hostName = "neet-installer";
         }
       ];
     };
