@@ -31,6 +31,10 @@
           };
           boot.console.keyMap = "jp106";
           programs.coreutils.package = pkgs.uutils-coreutils-noprefix;
+          environment.systemPackages = [
+            pkgs.vim
+            pkgs.sbctl
+          ];
           services.getty.autologinUser = "neet";
         }
       ];
