@@ -21,6 +21,7 @@
         # インストーラ機能を有効化
         {
           installer.enable = true;
+          #boot.consoles = ["tty1" "ttyS0"];
           services.iwd.enable = true;
           services.openssh = {
             enable = true;
@@ -44,6 +45,9 @@
       # nix build .#installer で .img.zst をビルド
       installer = installerSystem.config.system.build.diskImageZst;
       default = self.packages.${system}.installer;
+
+      stage1Script = installerSystem.config.system.build.stage1Script;
+      initrd = installerSystem.config.system.build.initrd;
     };
 
     apps.${system} = {
