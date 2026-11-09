@@ -29,7 +29,7 @@
               PermitRootLogin = "yes";
             };
           };
-          boot.console.keyMap = "jp106";
+          hardware.keyboard.keyMap = "jp106";
           programs.coreutils.package = pkgs.uutils-coreutils-noprefix;
           environment.systemPackages = [
             pkgs.vim
