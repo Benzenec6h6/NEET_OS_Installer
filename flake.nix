@@ -21,7 +21,6 @@
         # インストーラ機能を有効化
         {
           installer.enable = true;
-          #boot.consoles = ["tty1" "ttyS0"];
           services.iwd.enable = true;
           services.openssh = {
             enable = true;
